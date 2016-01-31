@@ -136,7 +136,7 @@ class SessionForm(messages.Message):
     duration        = messages.IntegerField(4)
     typeOfSession   = messages.EnumField('TypeOfSession', 5)
     date            = messages.StringField(6)
-    startTime       = message_types.DateTimeField(7)
+    startTime       = messages.StringField(7)
     websafeKey      = messages.StringField(8)
 
 class SessionForms(messages.Message):

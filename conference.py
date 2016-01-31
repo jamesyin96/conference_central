@@ -36,6 +36,13 @@ from models import ConferenceForms
 from models import ConferenceQueryForm
 from models import ConferenceQueryForms
 from models import TeeShirtSize
+from models import Session
+from models import SessionForm
+from models import SessionForms
+from models import TypeOfSession
+from models import SessionSpeakerQueryForm
+from models import SessionTypeQueryForm
+from models import SessionWishlistForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -90,8 +97,8 @@ SESS_GET_REQUEST = endpoints.ResourceContainer(
 )
 
 SESS_POST_REQUEST = endpoints.ResourceContainer(
-    ConferenceForm,
-    websafeSessionKey=messages.StringField(1),
+    SessionForm,
+    websafeConferenceKey=messages.StringField(1),
 )
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -563,44 +570,69 @@ class ConferenceApi(remote.Service):
         )
 
 
-    @endpoints.method(CONF_POST_REQUEST, SessionForms,
-            path='conference/{websafeConferenceKey}/createsession',
-            http_method='GET', name='createSession')
+    @endpoints.method(SESS_POST_REQUEST, BooleanMessage,
+            path='{websafeConferenceKey}/createSession',
+            http_method='POST', name='createSession')
     def createSession(self, request):
-        speaker = request.speaker
+        """Create a session for given conference"""
+        return self._createSessionObject(request)
 
+    def _createSessionObject(self, request):
+        """Create or Update Session object, returning SessionForm/request."""
+        # preload necessary data items
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        user_id = getUserId(user)
 
-    @endpoints.method(CONF_GET_REQUEST, SessionForms,
-            path='conference/{websafeConferenceKey}/sessions',
-            http_method='GET', name='getConferenceSessions')
-    def getConferenceSessions(self, request):
-        """ Given a conference, return all sessions """
-        # check if conf exists given websafeConfKey
-        # get conference; check that it exists
-        wsck = request.websafeConferenceKey
-        conf = ndb.Key(urlsafe=wsck).get()
-        if not conf:
-            raise endpoints.NotFoundException(
-                'No conference found with key: %s' % wsck)
+        if not request.websafeConferenceKey:
+            raise endpoints.BadRequestException("Session 'conference key' field reqruied")
 
+        if not request.name:
+            raise endpoints.BadRequestException("Session 'name' field required")
 
-    @endpoints.method(CONF_GET_REQUEST, SessionForms,
-            path='conference/{websafeConferenceKey}/{sessionType}/sessions',
-            http_method='GET', name='getConferenceSessionsByType')
-    def getConferenceSessionsByType(self, request):
-        wsck = request.websafeConferenceKey
-        sessionType = request.sessionType
-        conf = ndb.Key(urlsafe=wsck).get()
-        if not conf:
-            raise endpoints.NotFoundException(
-                'No conference found with key: %s' % wsck)
+        # copy SessionForm/ProtoRPC Message into dict
+        data = {field.name: getattr(request, field.name) for field in request.all_fields()}
+        del data['websafeKey']
+        del data['websafeConferenceKey']
 
+        # get the conference object
+        websafeConferenceKey = request.websafeConferenceKey
+        conf = ndb.Key(urlsafe=websafeConferenceKey).get()
 
-    @endpoints.method(message_types.VoidMessage, SessionForms,
-            path='conference/{speaker}/sessions',
-            http_method='GET', name='getSessionsBySpeaker')
-    def getSessionsBySpeaker(self, request):
-        speaker = request.speaker
+        # check if the current user is the creator of the conference, if not raise exception
+        if user_id != conf.organizerUserId:
+            raise endpoints.ForbiddenException("You are not authorized to create session")
 
+        name            = ndb.StringProperty(required=True)
+        highlights      = ndb.StringProperty()
+        speaker         = ndb.StringProperty()
+        duration        = ndb.IntegerProperty()
+
+        # convert dates from string to Date object;
+        if data['date']:
+            data['date'] = datetime.strptime(data['date'][:10], "%Y-%m-%d").date()
+
+        # convert startTime from string to Date object
+        if data['startTime']:
+            data['startTime'] = datetime.strftime(data['startTime'][:5], "%H:%M").date()
+
+        # convert type of session to string
+        if data['typeOfSession']:
+            data['typeOfSession'] = str(data['typeOfSession'])
+        else:
+            data['typeOfSession'] = 'Unknown'
+
+        # generate Profile Key based on user ID and Conference
+        # ID based on Profile key get Conference key from ID
+        p_key = ndb.Key(urlsafe=websafeConferenceKey)
+        s_id = Session.allocate_ids(size=1, parent=p_key)[0]
+        s_key = ndb.Key(Session, s_id, parent=p_key)
+        data['key'] = s_key
+
+        # create Session, send email to organizer confirming
+        # creation of Session & return (modified) SessionForm
+        Session(**data).put()
+        return BooleanMessage(data=True)
 
 api = endpoints.api_server([ConferenceApi]) # register API
