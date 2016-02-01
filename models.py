@@ -143,13 +143,13 @@ class SessionForms(messages.Message):
     """ConferenceForms -- multiple Conference outbound form message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
 
-class SessionSpeakerQueryForm(messages.Message):
-    """SessionSpeakerQueryForm -- Session query by speaker inbound message"""
-    speakerName = messages.StringField(1)
-
 class SessionTypeQueryForm(messages.Message):
     """SessionSpeakerQueryForm -- Session query by session type inbound message"""
     sessionType = messages.StringField(1)
+
+class SessionSpeakerQueryForm(messages.Message):
+    """SessionSpeakerQueryForm -- Session query by speaker inbound message"""
+    speaker = messages.StringField(1)
 
 class SessionWishlistForm(messages.Message):
     """SessionWishlistForm -- Session wishlist outbound message"""

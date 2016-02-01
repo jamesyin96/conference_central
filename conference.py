@@ -685,4 +685,15 @@ class ConferenceApi(remote.Service):
             items=[self._copySessionToForm(session) for session in sessions]
             )
 
+    @endpoints.method(SessionSpeakerQueryForm, SessionForms,
+            path='/sessionsBySpeaker',
+            http_method='POST', name='getSessionsBySpeaker')
+    def getSessionsBySpeaker(self, request):
+        """Get all sessions of a certain type for given conference"""
+        sessions = Session.query(Session.speaker==request.speaker)
+        return SessionForms(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
+
+
 api = endpoints.api_server([ConferenceApi]) # register API
