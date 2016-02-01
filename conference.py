@@ -93,7 +93,7 @@ CONF_POST_REQUEST = endpoints.ResourceContainer(
 
 SESS_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
-    websafeSessionKey=messages.StringField(1),
+    websafeConferenceKey=messages.StringField(1),
 )
 
 SESS_POST_REQUEST = endpoints.ResourceContainer(
@@ -569,7 +569,7 @@ class ConferenceApi(remote.Service):
             items=[self._copyConferenceToForm(conf, "") for conf in q]
         )
 
-
+# ---------------------- Sessions ---------------------------------
     @endpoints.method(SESS_POST_REQUEST, BooleanMessage,
             path='{websafeConferenceKey}/createSession',
             http_method='POST', name='createSession')
@@ -634,5 +634,35 @@ class ConferenceApi(remote.Service):
         # creation of Session & return (modified) SessionForm
         Session(**data).put()
         return BooleanMessage(data=True)
+
+    @endpoints.method(SESS_GET_REQUEST, SessionForms,
+            path='{websafeConferenceKey}/getConferenceSessions',
+            http_method='GET', name='getConferenceSessions')
+    def getConferenceSessions(self, request):
+        """Get all sessions for given conference"""
+        ancestor_key = ndb.Key(urlsafe=request.websafeConferenceKey)
+        sessions = Session.query(ancestor=ancestor_key).fetch()
+        return SessionForms(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
+
+    def _copySessionToForm(self, session):
+        """Copy relevant fields from Conference to ConferenceForm."""
+        sf = SessionForm()
+        for field in sf.all_fields():
+            if hasattr(session, field.name):
+                if field.name == 'typeOfSession':
+                    setattr(sf,
+                            field.name,
+                            getattr(TypeOfSession,
+                                    getattr(session, field.name)))
+                # convert Date to date string; just copy others
+                elif field.name == 'date' or field.name == 'startTime':
+                    setattr(sf, field.name, str(getattr(session, field.name)))
+                else:
+                    setattr(sf, field.name, getattr(session, field.name))
+            elif field.name == "websafeKey":
+                setattr(sf, field.name, session.key.urlsafe())
+        return sf
 
 api = endpoints.api_server([ConferenceApi]) # register API
