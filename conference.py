@@ -43,6 +43,8 @@ from models import TypeOfSession
 from models import SessionSpeakerQueryForm
 from models import SessionTypeQueryForm
 from models import SessionWishlistForm
+from models import SessionTypeQueryForm
+from models import SessionSpeakerQueryForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -98,6 +100,11 @@ SESS_GET_REQUEST = endpoints.ResourceContainer(
 
 SESS_POST_REQUEST = endpoints.ResourceContainer(
     SessionForm,
+    websafeConferenceKey=messages.StringField(1),
+)
+
+SESS_TYPEQUERY_REQUEST = endpoints.ResourceContainer(
+    SessionTypeQueryForm,
     websafeConferenceKey=messages.StringField(1),
 )
 
@@ -664,5 +671,18 @@ class ConferenceApi(remote.Service):
             elif field.name == "websafeKey":
                 setattr(sf, field.name, session.key.urlsafe())
         return sf
+
+    @endpoints.method(SESS_TYPEQUERY_REQUEST, SessionForms,
+            path='{websafeConferenceKey}/sessionsByType',
+            http_method='POST', name='getConferenceSessionsByType')
+    def getConferenceSessionsByType(self, request):
+        """Get all sessions of a certain type for given conference"""
+        ancestor_key = ndb.Key(urlsafe=request.websafeConferenceKey)
+        allSessions = Session.query(ancestor=ancestor_key)
+        sessions = allSessions.filter(Session.typeOfSession==request.sessionType).fetch()
+
+        return SessionForms(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
 
 api = endpoints.api_server([ConferenceApi]) # register API
