@@ -153,4 +153,4 @@ class SessionSpeakerQueryForm(messages.Message):
 
 class SessionWishlistForm(messages.Message):
     """SessionWishlistForm -- Session wishlist outbound message"""
-    sessionsWishlist = messages.StringField(1, repeated=True)
+    items = messages.MessageField(SessionForm, 1, repeated=True)
