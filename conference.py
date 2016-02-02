@@ -714,7 +714,7 @@ class ConferenceApi(remote.Service):
 
         if not session:
             raise endpoints.NotFoundException('No such session found!')
-        elif session in prof.sessionsWishlist:
+        elif session.key.urlsafe() in prof.sessionsWishlist:
             raise endpoints.ConflictException('This session is already on you wish list')
         else:
             prof.sessionsWishlist.append(websafeSessionKey)
@@ -737,5 +737,28 @@ class ConferenceApi(remote.Service):
             sessionForms.append(self._copySessionToForm(session))
         # return ProfileForm
         return SessionWishlistForm(items=sessionForms)
+
+    @endpoints.method(SESS_WISHLIST_POST_REQUEST, BooleanMessage,
+            path='{websafeSessionKey}/deleteSessionInWishlist',
+            http_method='POST', name='deleteSessionInWishlist')
+    def deleteSessionInWishlist(self, request):
+        """ Delete a session from current user's wishlist """
+        # get user Profile
+        prof = self._getProfileFromUser()
+        # get session; check that it exists
+        # check if session exists given websafeSessionKey
+        websafeSessionKey = request.websafeSessionKey
+        session = ndb.Key(urlsafe=websafeSessionKey).get()
+
+        if not session:
+            raise endpoints.NotFoundException('No such session found!')
+        elif session.key.urlsafe() in prof.sessionsWishlist:
+            prof.sessionsWishlist.remove(websafeSessionKey)
+        else:
+            raise endpoints.NotFoundException('This session is not in your wish list')
+
+        prof.put()
+        # return ProfileForm
+        return BooleanMessage(data=True)
 
 api = endpoints.api_server([ConferenceApi])  # register API
