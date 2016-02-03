@@ -140,11 +140,11 @@ class SessionForm(messages.Message):
     websafeKey      = messages.StringField(8)
 
 class SessionForms(messages.Message):
-    """ConferenceForms -- multiple Conference outbound form message"""
+    """SessionForms -- multiple Conference outbound form message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
 
 class SessionTypeQueryForm(messages.Message):
-    """SessionSpeakerQueryForm -- Session query by session type inbound message"""
+    """SessionTypeQueryForm -- Session query by session type inbound message"""
     sessionType = messages.StringField(1)
 
 class SessionSpeakerQueryForm(messages.Message):
@@ -154,3 +154,8 @@ class SessionSpeakerQueryForm(messages.Message):
 class SessionWishlistForm(messages.Message):
     """SessionWishlistForm -- Session wishlist outbound message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
+
+class SessionDateRangeQueryForm(messages.Message):
+    """"SessionDateRangeQueryForm -- Session query by date range inbound message"""
+    startDate = messages.StringField(1)
+    endDate   = messages.StringField(2)

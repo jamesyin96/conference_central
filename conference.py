@@ -14,6 +14,7 @@ __author__ = 'wesc+api@google.com (Wesley Chun)'
 
 
 from datetime import datetime
+from datetime import date
 
 import endpoints
 from protorpc import messages
@@ -43,8 +44,7 @@ from models import TypeOfSession
 from models import SessionSpeakerQueryForm
 from models import SessionTypeQueryForm
 from models import SessionWishlistForm
-from models import SessionTypeQueryForm
-from models import SessionSpeakerQueryForm
+from models import SessionDateRangeQueryForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -730,13 +730,12 @@ class ConferenceApi(remote.Service):
         """ Get sessions from current user's wishlist """
         # get user Profile
         prof = self._getProfileFromUser()
-        sessionsKeyList = prof.sessionsWishlist
-        sessionForms = []
-        for sessionKey in sessionsKeyList:
-            session = ndb.Key(urlsafe=sessionKey).get()
-            sessionForms.append(self._copySessionToForm(session))
-        # return ProfileForm
-        return SessionWishlistForm(items=sessionForms)
+        sessionsKeyList = [ndb.Key(urlsafe=sessionKey) for sessionKey in prof.sessionsWishlist]
+        sessions = ndb.get_multi(sessionsKeyList)
+        # return sessionForms
+        return SessionWishlistForm(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
 
     @endpoints.method(SESS_WISHLIST_POST_REQUEST, BooleanMessage,
             path='{websafeSessionKey}/deleteSessionInWishlist',
@@ -760,5 +759,34 @@ class ConferenceApi(remote.Service):
         prof.put()
         # return ProfileForm
         return BooleanMessage(data=True)
+
+# ------------------------------ Additional queries ---------------------------
+    @endpoints.method(message_types.VoidMessage, ConferenceForms,
+            path='/getOngoingConferences',
+            http_method='GET', name='getOngoingConferences')
+    def getOngoingConferences(self, request):
+        """Get all conference that are ongoing"""
+        today = date.today()
+        conferences = Conference.query().filter(Conference.startDate<=today).order(Conference.startDate)
+        if not conferences:
+            raise endpoints.NotFoundException('No conference is active now.')
+
+        return ConferenceForms(items=[self._copyConferenceToForm(cf) for cf in conferences if (cf.endDate and cf.endDate >= today)])
+
+    @endpoints.method(SessionDateRangeQueryForm, SessionForms,
+            path='/getSessionsByDateRange',
+            http_method='POST', name='getSessionsByDateRange')
+    def getSessionsByDateRange(self, request):
+        """Get all sessions of a certain type for given conference"""
+        startDate = datetime.strptime(request.startDate, "%Y-%m-%d").date()
+        endDate = datetime.strptime(request.endDate, "%Y-%m-%d").date()
+        sessions = Session.query().filter(Session.date>=startDate).filter(Session.date<=endDate).order(Session.date)
+
+        if not sessions:
+            raise endpoints.NotFoundException('No session is available in this date range.')
+
+        return SessionForms(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
 
 api = endpoints.api_server([ConferenceApi])  # register API
