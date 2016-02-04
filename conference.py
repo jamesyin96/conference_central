@@ -616,11 +616,6 @@ class ConferenceApi(remote.Service):
         if user_id != conf.organizerUserId:
             raise endpoints.ForbiddenException("You are not authorized to create session")
 
-        name            = ndb.StringProperty(required=True)
-        highlights      = ndb.StringProperty()
-        speaker         = ndb.StringProperty()
-        duration        = ndb.IntegerProperty()
-
         # convert dates from string to Date object;
         if data['date']:
             data['date'] = datetime.strptime(data['date'][:10], "%Y-%m-%d").date()
@@ -646,6 +641,12 @@ class ConferenceApi(remote.Service):
         # create Session, send email to organizer confirming
         # creation of Session & return (modified) SessionForm
         Session(**data).put()
+        speaker = data['speaker']
+        if speaker:
+            speakerSessionQuant = Session.query(Session.speaker==speaker).count()
+            if speakerSessionQuant > 1:
+                memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, speaker)
+
         return BooleanMessage(data=True)
 
     @endpoints.method(SESS_GET_REQUEST, SessionForms,
