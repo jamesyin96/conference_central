@@ -771,7 +771,7 @@ class ConferenceApi(remote.Service):
         if not conferences:
             raise endpoints.NotFoundException('No conference is active now.')
 
-        return ConferenceForms(items=[self._copyConferenceToForm(cf) for cf in conferences if (cf.endDate and cf.endDate >= today)])
+        return ConferenceForms(items=[self._copyConferenceToForm(cf, cf.organizerUserId) for cf in conferences if (cf.endDate and cf.endDate >= today)])
 
     @endpoints.method(SessionDateRangeQueryForm, SessionForms,
             path='/getSessionsByDateRange',
@@ -796,13 +796,13 @@ class ConferenceApi(remote.Service):
         """Get all sessions that are not workshops and before 7 pm"""
         allowedSesstionType = ['Unknown', 'Lecture', 'Keynote']
         timethres = datetime.strptime("19:00", "%H:%M").time()
-        sessions = Session.query().filter(Session.typeOfSession in allowedSesstionType).filter(Session.startTime<=timethres).order(Session.startTime)
+        sessions = Session.query().filter(Session.startTime<=timethres).order(Session.startTime)
 
         if not sessions:
             raise endpoints.NotFoundException('No session is available in this date range.')
 
         return SessionForms(
-            items=[self._copySessionToForm(session) for session in sessions]
+            items=[self._copySessionToForm(session) for session in sessions if session.startTime]
             )
 
 api = endpoints.api_server([ConferenceApi])  # register API
