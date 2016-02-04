@@ -45,6 +45,7 @@ from models import SessionSpeakerQueryForm
 from models import SessionTypeQueryForm
 from models import SessionWishlistForm
 from models import SessionDateRangeQueryForm
+from models import FeaturedSpeakerQueryForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -56,6 +57,7 @@ from utils import getUserId
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT_ANNOUNCEMENTS"
+MEMCACHE_FEATUREDSPEAKER_KEY = "FEATURED_SPEAKER"
 ANNOUNCEMENT_TPL = ('Last chance to attend! The following conferences '
                     'are nearly sold out: %s')
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -802,7 +804,28 @@ class ConferenceApi(remote.Service):
             raise endpoints.NotFoundException('No session is available in this date range.')
 
         return SessionForms(
-            items=[self._copySessionToForm(session) for session in sessions if session.startTime]
+            items=[self._copySessionToForm(session) for session in sessions if (session.startTime and session.typeOfSession in allowedSesstionType)]
             )
+
+    @endpoints.method(message_types.VoidMessage, FeaturedSpeakerQueryForm,
+            path='/getFeaturedSpeaker',
+            http_method='GET', name='getFeaturedSpeaker')
+    def getFeaturedSpeaker(self, request):
+        """Get current feature speaker"""
+        return FeaturedSpeakerQueryForm(featuredSpeaker=self.setFeaturedSpeaker())
+
+    @staticmethod
+    def setFeaturedSpeaker():
+        featuredSpeaker = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        if not featuredSpeaker:
+            # If there is no featured speaker in memcache, find one and put it in memcache
+            nextTwoSessions = Session.query().order(Session.speaker).fetch(2)
+            if len(nextTwoSessions) == 2:
+                session1 = nextTwoSessions[0]
+                session2 = nextTwoSessions[1]
+                if session1.speaker == session2.speaker:
+                    memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, session1.speaker)
+
+        return featuredSpeaker
 
 api = endpoints.api_server([ConferenceApi])  # register API

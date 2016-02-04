@@ -156,6 +156,10 @@ class SessionWishlistForm(messages.Message):
     items = messages.MessageField(SessionForm, 1, repeated=True)
 
 class SessionDateRangeQueryForm(messages.Message):
-    """"SessionDateRangeQueryForm -- Session query by date range inbound message"""
+    """SessionDateRangeQueryForm -- Session query by date range inbound message"""
     startDate = messages.StringField(1)
     endDate   = messages.StringField(2)
+
+class FeaturedSpeakerQueryForm(messages.Message):
+    """Featured speaker query outbound message"""
+    featuredSpeaker = messages.StringField(1)
