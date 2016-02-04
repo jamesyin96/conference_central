@@ -385,7 +385,6 @@ class ConferenceApi(remote.Service):
         p_key = ndb.Key(Profile, user_id)
         profile = p_key.get()
 
-        
         # create new Profile if not there
         if not profile:
             profile = Profile(
@@ -626,7 +625,8 @@ class ConferenceApi(remote.Service):
 
         # convert startTime from string to Date object
         if data['startTime']:
-            data['startTime'] = datetime.strftime(data['startTime'][:5], "%H:%M").date()
+            print data['startTime']
+            data['startTime'] = datetime.strptime(data['startTime'][:5], "%H:%M").time()
 
         # convert type of session to string
         if data['typeOfSession']:
@@ -777,10 +777,26 @@ class ConferenceApi(remote.Service):
             path='/getSessionsByDateRange',
             http_method='POST', name='getSessionsByDateRange')
     def getSessionsByDateRange(self, request):
-        """Get all sessions of a certain type for given conference"""
+        """Get all sessions for a given date range"""
         startDate = datetime.strptime(request.startDate, "%Y-%m-%d").date()
         endDate = datetime.strptime(request.endDate, "%Y-%m-%d").date()
         sessions = Session.query().filter(Session.date>=startDate).filter(Session.date<=endDate).order(Session.date)
+
+        if not sessions:
+            raise endpoints.NotFoundException('No session is available in this date range.')
+
+        return SessionForms(
+            items=[self._copySessionToForm(session) for session in sessions]
+            )
+
+    @endpoints.method(message_types.VoidMessage, SessionForms,
+            path='/getPreferredSessions',
+            http_method='GET', name='getPreferredSessions')
+    def getPreferredSessions(self, request):
+        """Get all sessions that are not workshops and before 7 pm"""
+        allowedSesstionType = ['Unknown', 'Lecture', 'Keynote']
+        timethres = datetime.strptime("19:00", "%H:%M").time()
+        sessions = Session.query().filter(Session.typeOfSession in allowedSesstionType).filter(Session.startTime<=timethres).order(Session.startTime)
 
         if not sessions:
             raise endpoints.NotFoundException('No session is available in this date range.')
