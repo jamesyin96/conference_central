@@ -643,7 +643,7 @@ class ConferenceApi(remote.Service):
         Session(**data).put()
         speaker = data['speaker']
         if speaker:
-            speakerSessionQuant = Session.query(Session.speaker==speaker).count()
+            speakerSessionQuant = Session.query(ancestor=p_key).filter(Session.speaker==speaker).count()
             if speakerSessionQuant > 1:
                 memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, speaker)
 
@@ -697,7 +697,7 @@ class ConferenceApi(remote.Service):
             http_method='POST', name='getSessionsBySpeaker')
     def getSessionsBySpeaker(self, request):
         """Get all sessions of a certain type for given conference"""
-        sessions = Session.query(Session.speaker==request.speaker)
+        sessions = Session.query(Session.speaker==request.speaker).fetch()
         return SessionForms(
             items=[self._copySessionToForm(session) for session in sessions]
             )
@@ -770,7 +770,7 @@ class ConferenceApi(remote.Service):
     def getOngoingConferences(self, request):
         """Get all conference that are ongoing"""
         today = date.today()
-        conferences = Conference.query().filter(Conference.startDate<=today).order(Conference.startDate)
+        conferences = Conference.query().filter(Conference.startDate<=today).order(Conference.startDate).fetch()
         if not conferences:
             raise endpoints.NotFoundException('No conference is active now.')
 
@@ -783,7 +783,7 @@ class ConferenceApi(remote.Service):
         """Get all sessions for a given date range"""
         startDate = datetime.strptime(request.startDate, "%Y-%m-%d").date()
         endDate = datetime.strptime(request.endDate, "%Y-%m-%d").date()
-        sessions = Session.query().filter(Session.date>=startDate).filter(Session.date<=endDate).order(Session.date)
+        sessions = Session.query().filter(Session.date>=startDate).filter(Session.date<=endDate).order(Session.date).fetch()
 
         if not sessions:
             raise endpoints.NotFoundException('No session is available in this date range.')
@@ -799,13 +799,13 @@ class ConferenceApi(remote.Service):
         """Get all sessions that are not workshops and before 7 pm"""
         allowedSesstionType = ['Unknown', 'Lecture', 'Keynote']
         timethres = datetime.strptime("19:00", "%H:%M").time()
-        sessions = Session.query().filter(Session.startTime<=timethres).order(Session.startTime)
+        sessions = Session.query(Session.typeOfSession.IN(allowedSesstionType)).filter(Session.startTime<=timethres).order(Session.startTime).fetch()
 
         if not sessions:
             raise endpoints.NotFoundException('No session is available in this date range.')
 
         return SessionForms(
-            items=[self._copySessionToForm(session) for session in sessions if (session.startTime and session.typeOfSession in allowedSesstionType)]
+            items=[self._copySessionToForm(session) for session in sessions if session.startTime]
             )
 
     @endpoints.method(message_types.VoidMessage, FeaturedSpeakerQueryForm,
@@ -813,19 +813,31 @@ class ConferenceApi(remote.Service):
             http_method='GET', name='getFeaturedSpeaker')
     def getFeaturedSpeaker(self, request):
         """Get current feature speaker"""
-        return FeaturedSpeakerQueryForm(featuredSpeaker=self.setFeaturedSpeaker())
+        return FeaturedSpeakerQueryForm(featuredSpeaker=self.cacheFeaturedSpeaker())
 
     @staticmethod
-    def setFeaturedSpeaker():
+    def cacheFeaturedSpeaker():
         featuredSpeaker = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        # If there is no featured speaker in memcache, find one and put it in memcache
         if not featuredSpeaker:
-            # If there is no featured speaker in memcache, find one and put it in memcache
-            nextTwoSessions = Session.query().order(Session.speaker).fetch(2)
-            if len(nextTwoSessions) == 2:
-                session1 = nextTwoSessions[0]
-                session2 = nextTwoSessions[1]
-                if session1.speaker == session2.speaker:
-                    memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, session1.speaker)
+            # get all conferences' key
+            conferenceKeys = Conference.query().fetch(keys_only=True)
+            for key in conferenceKeys:
+                # for each conference, query two sessions ordered by speaker, and fetch
+                confSessions = Session.query(ancestor=key).order(Session.speaker).fetch()
+                # loop all sessions in the conference, find if two sessions have the same speaker
+                i = 0
+                j = 1
+                while(j < i + 2 and j < len(confSessions)):
+                    if confSessions[i].speaker == confSessions[j].speaker:
+                        featuredSpeaker = confSessions[i].speaker
+                        memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, featuredSpeaker)
+                        break
+                    else:
+                        i += 1
+                        j += 1
+                if featuredSpeaker:
+                    break
 
         return featuredSpeaker
 
