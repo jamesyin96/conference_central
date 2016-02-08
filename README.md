@@ -45,11 +45,11 @@ It's a class containing information about a speaker. This class is not used for 
 
 ## Task 2: Add Sessions to User Wishlist
 ### Design
-Since each session does not belong to a particular user, we don't want each user to have an entity for each session in his/her wishlist. Instead, we just need to save a list of keys that can represent sessions in the wishlist.
+Since each session does not particularly belong to a user, we don't want each user to have an entity copy for each session in his/her wishlist. Instead, we just need to save a list of keys that can represent sessions in the wishlist.
 
-To do this, we add a sessionWishList property in Profile kind. This property is string and repeated, which can save more space than storing the whole session infomation. When we want to retrieve session information, we just need to get the key first and then fetch information using the key.
+To do this, we add a sessionWishList property into Profile kind. This property is string and repeated, which takes less space than storing the whole session infomation. When we want to retrieve session information, we just need to get the key first and then fetch information using the key.
 
-We don't want to force people to register for the meeting in order to add sessions into wishlist,so everyone can add sessions into their wishlist.
+We don't want to force people to register for the meeting in order to add sessions to wishlist, so everyone can add sessions into their wishlist.
 
 ### Endpoint APIs
 - addSessionToWishlist(SessionKey) -- adds the session to the user's list of sessions they are interested in attending
@@ -59,12 +59,12 @@ We don't want to force people to register for the meeting in order to add sessio
 ## Task 3: Work on indexes and queries
 ### Additional queries
 - getOngoingConferences() -- get all conferences that are ongoing, this might be helpful for people to search for meeting they can attend for their current time.
-- getSessionsByDateRange(startDate, endDate) -- get all sessions that are held for a given time period. This can help people plan their schedule more efficiently before they go to the meeting.
+- getSessionsByDateRange(startDate, endDate) -- get all sessions that are held for a given date range. This can help people plan their schedule more efficiently before they go to the meeting.
 
 ### Query problem
 Let’s say that you don't like workshops and you don't like sessions after 7 pm. How would you handle a query for all non-workshop sessions before 7 pm? What is the problem for implementing this query? What ways to solve it did you think of?
 
-This problem is a query that requires two inequality (not workspace, before 7 pm). Usually we can do two inequality in one datastore query, but luckily, the kinds of sessions that are available is not unlimited so we can transform the inequality into equality. Notice that of all the operators in datastore query, there is a "IN" operator which can represent member of (equal to any of the values in a specified list), so we can make the allowed type of sessions in a list and query for session type IN allowed type list.
+This problem is a query that requires two inequality (not workspace and before 7 pm). Usually we can not do two inequality in one datastore query, but luckily, the kinds of sessions that are available is not unlimited so we can transform the inequality into equality. Notice that of all the operators in datastore query, there is a "IN" operator which can represent member of (equal to any of the values in a specified list), so we can make the allowed type of sessions in a list and query for session type IN allowed type list.
 
 The endpoint API for this query is getPreferredSessions()
 
