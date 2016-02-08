@@ -18,30 +18,62 @@ App Engine application project for the Udacity web developer course.
 1. Deploy your application.
 
 ## Task 1: Add Sessions to a Conference
-Session: It's a class containing basic information about a session. Properties include:
+### Design
+#### Session: 
+It's a class containing basic information about a session. Properties include:
+- name: Each session must have a name(title), so we should use ndb.StringProperty(required=True)
+- highlights: It can be keywords, descriptor or abstraction, so use ndb.StringProperty()
+- speaker: we also want to know the name of the speaker, but so far we don't need to know more about a speaker, so use ndb.StringProperty()
+- duration: It's how long the session last, so use ndb.IntegerProperty()
+- typeOfSession: we have different kinds of sessions, but if the user does not specify which type, we can let it be "Unknown", so use ndb.StringProperty(default='Unknown')
+- date: Similar to conference date, we need to have a date for the session, so use ndb.DateProperty()
+- startTime: To inform people to attend the session at the right time, we also need to have a property indicating the start time of the session, so use ndb.TimeProperty()
 
-1. name: Each session must have a name(title), so we should use ndb.StringProperty(required=True)
-2. highlights: It can be keywords, descriptor or abstraction, so use ndb.StringProperty()
-3. speaker: we also want to know the name of the speaker, but so far we don't need to know more about a speaker, so use ndb.StringProperty()
-4. duration: It's how long the session last, so use ndb.IntegerProperty()
-5. typeOfSession: we have different kinds of sessions, but if the user does not specify which type, we can let it be "Unknown", so use ndb.StringProperty(default='Unknown')
-6. date: Similar to conference date, we need to have a date for the session, so use ndb.DateProperty()
-startTime: To inform people to attend the session at the right time, we also need to have a property indicating the start time of the session, so use ndb.TimeProperty()
+#### Speaker:
+It's a class containing information about a speaker. This class is not used for now. But it can extend the session information about the speaker if people want to know more about the speaker. This class can also be used for implementing a speaker related endpoint. Peoperties are:
 
-Speaker: It's a class containing information about a speaker. This class is not used for now. But it can extend the session information about the speaker if people want to know more about the speaker. This class can also be used for implementing a speaker related endpoint. Peoperties are:
+- name: ndb.StringProperty(required=True)
+- age: ndb.IntegerProperty()
+- industry: It represents which industry for field this speaker comes from, so use ndb.StringProperty()
 
-1. name: ndb.StringProperty(required=True)
-2. age: ndb.IntegerProperty()
-3. industry: It represents which industry for field this speaker comes from, so use ndb.StringProperty()
+### Endpoint APIs
+- getConferenceSessions(websafeConferenceKey) -- Given a conference, return all sessions
+- getConferenceSessionsByType(websafeConferenceKey, typeOfSession) Given a conference, return all sessions of a specified type (eg lecture, keynote, workshop)
+- getSessionsBySpeaker(speaker) -- Given a speaker, return all sessions given by this particular speaker, across all conferences
+- createSession(SessionForm, websafeConferenceKey) -- open only to the organizer of the conference
+
 
 ## Task 2: Add Sessions to User Wishlist
-- Wish list
+### Design
+Since each session does not belong to a particular user, we don't want each user to have an entity for each session in his/her wishlist. Instead, we just need to save a list of keys that can represent sessions in the wishlist.
+
+To do this, we add a sessionWishList property in Profile kind. This property is string and repeated, which can save more space than storing the whole session infomation. When we want to retrieve session information, we just need to get the key first and then fetch information using the key.
+
+We don't want to force people to register for the meeting in order to add sessions into wishlist,so everyone can add sessions into their wishlist.
+
+### Endpoint APIs
+- addSessionToWishlist(SessionKey) -- adds the session to the user's list of sessions they are interested in attending
+- getSessionsInWishlist() -- query for all the sessions in a conference that the user is interested in
+- deleteSessionInWishlist(SessionKey) -- removes the session from the user’s list of sessions they are interested in attending
 
 ## Task 3: Work on indexes and queries
--
+### Additional queries
+- getOngoingConferences() -- get all conferences that are ongoing, this might be helpful for people to search for meeting they can attend for their current time.
+- getSessionsByDateRange(startDate, endDate) -- get all sessions that are held for a given time period. This can help people plan their schedule more efficiently before they go to the meeting.
 
-## Task 4: Add a Task
+### Query problem
+Let’s say that you don't like workshops and you don't like sessions after 7 pm. How would you handle a query for all non-workshop sessions before 7 pm? What is the problem for implementing this query? What ways to solve it did you think of?
 
+This problem is a query that requires two inequality (not workspace, before 7 pm). Usually we can do two inequality in one datastore query, but luckily, the kinds of sessions that are available is not unlimited so we can transform the inequality into equality. Notice that of all the operators in datastore query, there is a "IN" operator which can represent member of (equal to any of the values in a specified list), so we can make the allowed type of sessions in a list and query for session type IN allowed type list.
+
+The endpoint API for this query is getPreferredSessions()
+
+## Task 4: Featured speaker & Add a task
+### Featured speaker query
+The endpoint API implemented here is getFeaturedSpeaker(), what is does is that it will first query the Memcache for current featured speaker, if there's no featured speaker for now, it will try to find a featured speaker from all sessions.
+
+### Scheduled task
+For each one hour, the server will run the function that sets the featured speaker in Memcache. This can help reduce traffic and improve response because cache is faster and featured speaker does not need to be stored in the database.
 
 [1]: https://console.developers.google.com/
 [2]: https://localhost:8080/
