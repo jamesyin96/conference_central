@@ -8,9 +8,9 @@ $Id: models.py,v 1.1 2014/05/24 22:01:10 wesc Exp $
 
 created/forked from conferences.py by wesc on 2014 may 24
 
-"""
+wesc+api@google.com (Wesley Chun)
 
-__author__ = 'wesc+api@google.com (Wesley Chun)'
+"""
 
 import httplib
 import endpoints
@@ -18,9 +18,11 @@ from protorpc import messages
 from protorpc import message_types
 from google.appengine.ext import ndb
 
+
 class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
+
 
 class Profile(ndb.Model):
     """Profile -- User profile object"""
@@ -30,10 +32,12 @@ class Profile(ndb.Model):
     conferenceKeysToAttend = ndb.StringProperty(repeated=True)
     sessionsWishlist = ndb.StringProperty(repeated=True)
 
+
 class ProfileMiniForm(messages.Message):
     """ProfileMiniForm -- update Profile form message"""
     displayName = messages.StringField(1)
     teeShirtSize = messages.EnumField('TeeShirtSize', 2)
+
 
 class ProfileForm(messages.Message):
     """ProfileForm -- Profile outbound form message"""
@@ -43,13 +47,16 @@ class ProfileForm(messages.Message):
     conferenceKeysToAttend = messages.StringField(4, repeated=True)
     sessionsWishlist = messages.StringField(5, repeated=True)
 
+
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
 
+
 class BooleanMessage(messages.Message):
     """BooleanMessage-- outbound Boolean value message"""
     data = messages.BooleanField(1)
+
 
 class Conference(ndb.Model):
     """Conference -- Conference object"""
@@ -59,10 +66,11 @@ class Conference(ndb.Model):
     topics          = ndb.StringProperty(repeated=True)
     city            = ndb.StringProperty()
     startDate       = ndb.DateProperty()
-    month           = ndb.IntegerProperty() # TODO: do we need for indexing like Java?
+    month           = ndb.IntegerProperty()  # TODO: do we need for indexing like Java?
     endDate         = ndb.DateProperty()
     maxAttendees    = ndb.IntegerProperty()
     seatsAvailable  = ndb.IntegerProperty()
+
 
 class ConferenceForm(messages.Message):
     """ConferenceForm -- Conference outbound form message"""
@@ -79,9 +87,11 @@ class ConferenceForm(messages.Message):
     websafeKey      = messages.StringField(11)
     organizerDisplayName = messages.StringField(12)
 
+
 class ConferenceForms(messages.Message):
     """ConferenceForms -- multiple Conference outbound form message"""
     items = messages.MessageField(ConferenceForm, 1, repeated=True)
+
 
 class TeeShirtSize(messages.Enum):
     """TeeShirtSize -- t-shirt size enumeration value"""
@@ -101,6 +111,7 @@ class TeeShirtSize(messages.Enum):
     XXXL_M = 14
     XXXL_W = 15
 
+
 class TypeOfSession(messages.Enum):
     """TypeOfSession -- several types of session """
     Unknown = 0
@@ -108,15 +119,18 @@ class TypeOfSession(messages.Enum):
     Keynote = 2
     Workshop = 3
 
+
 class ConferenceQueryForm(messages.Message):
     """ConferenceQueryForm -- Conference query inbound form message"""
     field = messages.StringField(1)
     operator = messages.StringField(2)
     value = messages.StringField(3)
 
+
 class ConferenceQueryForms(messages.Message):
-    """ConferenceQueryForms -- multiple ConferenceQueryForm inbound form message"""
+    """ConferenceQueryForms -- multiConferenceQueryForm inbound form message"""
     filters = messages.MessageField(ConferenceQueryForm, 1, repeated=True)
+
 
 class Session(ndb.Model):
     """Session -- Session object"""
@@ -127,6 +141,7 @@ class Session(ndb.Model):
     typeOfSession   = ndb.StringProperty(default='Unknown')
     date            = ndb.DateProperty()
     startTime       = ndb.TimeProperty()
+
 
 class SessionForm(messages.Message):
     """SessionForm -- Session outbound form message"""
@@ -139,33 +154,40 @@ class SessionForm(messages.Message):
     startTime       = messages.StringField(7)
     websafeKey      = messages.StringField(8)
 
+
 class SessionForms(messages.Message):
     """SessionForms -- multiple Conference outbound form message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
+
 
 class SessionTypeQueryForm(messages.Message):
     """SessionTypeQueryForm -- Session query by session type inbound message"""
     sessionType = messages.StringField(1)
 
+
 class SessionSpeakerQueryForm(messages.Message):
     """SessionSpeakerQueryForm -- Session query by speaker inbound message"""
     speaker = messages.StringField(1)
+
 
 class SessionWishlistForm(messages.Message):
     """SessionWishlistForm -- Session wishlist outbound message"""
     items = messages.MessageField(SessionForm, 1, repeated=True)
 
+
 class SessionDateRangeQueryForm(messages.Message):
-    """SessionDateRangeQueryForm -- Session query by date range inbound message"""
+    """SessionDateRangeQueryForm -- Session query by date range inbound msg"""
     startDate = messages.StringField(1)
     endDate   = messages.StringField(2)
+
 
 class FeaturedSpeakerQueryForm(messages.Message):
     """Featured speaker query outbound message"""
     featuredSpeaker = messages.StringField(1)
 
+
 class Speaker(ndb.Model):
     """Speaker -- Speaker object"""
-    name            = ndb.StringProperty(required=True)
-    age             = ndb.IntegerProperty()
-    industry        = ndb.StringProperty()
+    name         = ndb.StringProperty(required=True)
+    age          = ndb.IntegerProperty()
+    industry     = ndb.StringProperty()
