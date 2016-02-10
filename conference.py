@@ -918,7 +918,8 @@ class ConferenceApi(remote.Service):
                     sessionNames = [sess.name for sess in featuredSessions]
                     break
 
-        return FeaturedSpeakerQueryForm(featuredSpeaker=featuredSpeaker,
-                                        featuredSessions=sessionNames)
+        cacheForm = FeaturedSpeakerQueryForm(featuredSpeaker=featuredSpeaker,
+                                             featuredSessions=sessionNames)
+        memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
 
 api = endpoints.api_server([ConferenceApi])  # register API
