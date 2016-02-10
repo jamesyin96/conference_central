@@ -714,7 +714,7 @@ class ConferenceApi(remote.Service):
                       http_method='POST', name='getSessionsBySpeaker')
     def getSessionsBySpeaker(self, request):
         """Get all sessions for given speaker"""
-        sessions = Session.query(Session.speaker == request.speaker).fetch()
+        sessions = Session.query(Session.speaker == request.speaker)
         return SessionForms(
             items=[self._copySessionToForm(session) for session in sessions]
             )
@@ -723,6 +723,7 @@ class ConferenceApi(remote.Service):
     @endpoints.method(SESS_WISHLIST_POST_REQUEST, BooleanMessage,
                       path='{websafeSessionKey}/addSessionToWishlist',
                       http_method='POST', name='addSessionToWishlist')
+    @ndb.transactional()
     def addSessionToWishlist(self, request):
         """ Add a session to current user's wishlist """
         # get user Profile
@@ -762,6 +763,7 @@ class ConferenceApi(remote.Service):
     @endpoints.method(SESS_WISHLIST_POST_REQUEST, BooleanMessage,
                       path='{websafeSessionKey}/deleteSessionInWishlist',
                       http_method='POST', name='deleteSessionInWishlist')
+    @ndb.transactional()
     def deleteSessionInWishlist(self, request):
         """ Delete a session from current user's wishlist """
         # get user Profile
