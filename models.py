@@ -184,10 +184,4 @@ class SessionDateRangeQueryForm(messages.Message):
 class FeaturedSpeakerQueryForm(messages.Message):
     """Featured speaker query outbound message"""
     featuredSpeaker = messages.StringField(1)
-
-
-class Speaker(ndb.Model):
-    """Speaker -- Speaker object"""
-    name         = ndb.StringProperty(required=True)
-    age          = ndb.IntegerProperty()
-    industry     = ndb.StringProperty()
+    featuredSessions = messages.StringField(2, repeated=True)

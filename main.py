@@ -45,8 +45,17 @@ class SetFeaturedSpeakerHandler(webapp2.RequestHandler):
         ConferenceApi.cacheFeaturedSpeaker()
         self.response.set_status(204)
 
+class AddFeaturedSessionHandler(webapp2.RequestHandler):
+    def post(self):
+        """Add  current featured speaker"""
+        ConferenceApi.addFeaturedSession(self.request.get('speaker'),
+                                         self.request.get('sessionName'),
+                                         self.request.get('websafeConfKey'))
+        self.response.set_status(204)
+
 app = webapp2.WSGIApplication([
     ('/crons/set_announcement', SetAnnouncementHandler),
     ('/tasks/send_confirmation_email', SendConfirmationEmailHandler),
     ('/crons/set_featured_speaker', SetFeaturedSpeakerHandler),
+    ('/tasks/add_featured_session', AddFeaturedSessionHandler)
 ], debug=True)

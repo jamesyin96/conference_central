@@ -41,6 +41,10 @@ handlers:       # static then dynamic
   script: main.app
   login: admin
 
+- url: /tasks/add_featured_session
+  script: main.app
+  login: admin
+
 - url: /_ah/spi/.*
   script: conference.api
   secure: always

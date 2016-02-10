@@ -593,8 +593,8 @@ class ConferenceApi(remote.Service):
         return self._createSessionObject(request)
 
     def _createSessionObject(self, request):
-        """Create or Update Session object, returning SessionForm/request."""
-        # preload necessary data items
+        """Create or Update Session object."""
+        # get user and verify user authentication
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -629,7 +629,7 @@ class ConferenceApi(remote.Service):
             data['date'] = datetime.strptime(data['date'][:10],
                                              "%Y-%m-%d").date()
 
-        # convert startTime from string to Date object
+        # convert startTime from string to time object
         if data['startTime']:
             print data['startTime']
             data['startTime'] = datetime.strptime(data['startTime'][:5],
@@ -641,22 +641,27 @@ class ConferenceApi(remote.Service):
         else:
             data['typeOfSession'] = 'Unknown'
 
-        # generate Profile Key based on user ID and Conference
-        # ID based on Profile key get Conference key from ID
-        p_key = ndb.Key(urlsafe=websafeConferenceKey)
-        s_id = Session.allocate_ids(size=1, parent=p_key)[0]
-        s_key = ndb.Key(Session, s_id, parent=p_key)
+        # generate session ID based on conference key
+        c_key = ndb.Key(urlsafe=websafeConferenceKey)
+        s_id = Session.allocate_ids(size=1, parent=c_key)[0]
+        # generate session key based on session ID and conference key
+        s_key = ndb.Key(Session, s_id, parent=c_key)
         data['key'] = s_key
 
-        # create Session, send email to organizer confirming
-        # creation of Session & return (modified) SessionForm
+        # create Session, add session to memcache if the session speaker is
+        # featured speaker
         Session(**data).put()
         speaker = data['speaker']
+        sessionName = data['name']
         if speaker:
             speakerSessionQuant = Session.query(
-                ancestor=p_key).filter(Session.speaker == speaker).count()
+                ancestor=c_key).filter(Session.speaker == speaker).count()
             if speakerSessionQuant > 1:
-                memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, speaker)
+                taskqueue.add(params={'speaker': speaker,
+                                      'sessionName': sessionName,
+                                      'websafeConfKey': websafeConferenceKey},
+                              url='/tasks/add_featured_session'
+                              )
 
         return BooleanMessage(data=True)
 
@@ -672,7 +677,7 @@ class ConferenceApi(remote.Service):
             )
 
     def _copySessionToForm(self, session):
-        """Copy relevant fields from Conference to ConferenceForm."""
+        """Copy relevant fields from Session to SessionForm."""
         sf = SessionForm()
         for field in sf.all_fields():
             if hasattr(session, field.name):
@@ -708,7 +713,7 @@ class ConferenceApi(remote.Service):
                       path='/sessionsBySpeaker',
                       http_method='POST', name='getSessionsBySpeaker')
     def getSessionsBySpeaker(self, request):
-        """Get all sessions of a certain type for given conference"""
+        """Get all sessions for given speaker"""
         sessions = Session.query(Session.speaker == request.speaker).fetch()
         return SessionForms(
             items=[self._copySessionToForm(session) for session in sessions]
@@ -736,7 +741,6 @@ class ConferenceApi(remote.Service):
             prof.sessionsWishlist.append(websafeSessionKey)
 
         prof.put()
-        # return ProfileForm
         return BooleanMessage(data=True)
 
     @endpoints.method(message_types.VoidMessage, SessionWishlistForm,
@@ -749,7 +753,7 @@ class ConferenceApi(remote.Service):
         sessionsKeyList = [ndb.Key(urlsafe=sessionKey)
                            for sessionKey in prof.sessionsWishlist]
         sessions = ndb.get_multi(sessionsKeyList)
-        # return sessionForms
+        # return SessioinWishListForm
         return SessionWishlistForm(
             items=[self._copySessionToForm(session)
                    for session in sessions]
@@ -776,7 +780,6 @@ class ConferenceApi(remote.Service):
                 'This session is not in your wish list')
 
         prof.put()
-        # return ProfileForm
         return BooleanMessage(data=True)
 
 # ------------------------------ Additional queries ---------------------------
@@ -803,6 +806,10 @@ class ConferenceApi(remote.Service):
         """Get all sessions for a given date range"""
         startDate = datetime.strptime(request.startDate, "%Y-%m-%d").date()
         endDate = datetime.strptime(request.endDate, "%Y-%m-%d").date()
+        if not startDate:
+            raise endpoints.BadRequestException("startDate is required!")
+        if not endDate:
+            raise endpoints.BadRequestException("endDate is required!")
         sessions = Session.query().filter(
             Session.date >= startDate).filter(
                 Session.date <= endDate).order(Session.date).fetch()
@@ -840,16 +847,54 @@ class ConferenceApi(remote.Service):
                       path='/getFeaturedSpeaker',
                       http_method='GET', name='getFeaturedSpeaker')
     def getFeaturedSpeaker(self, request):
-        """Get current feature speaker"""
-        return FeaturedSpeakerQueryForm(
-                   featuredSpeaker=self.cacheFeaturedSpeaker())
+        """
+        Try to get current feature speaker, if it exists.
+        Else return an empty form. The background task which set the
+        featuredSpeaker may be running shortly
+        """
+        featuredSpeakerForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        if not featuredSpeakerForm:
+            featuredSpeakerForm = FeaturedSpeakerQueryForm()
+        return featuredSpeakerForm
+
+    @staticmethod
+    def addFeaturedSession(speaker, sessionName, confKey):
+        """
+        This is an task that can add a session into the
+        FeaturedSpeakerQueryForm in memcache
+        """
+        cacheForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        # if the input speaker is the featured speaker, we add the session to
+        # the featured sessions list and save it to memcache
+        print speaker, sessionName
+        if cacheForm and cacheForm.featuredSpeaker == speaker:
+            cacheForm.featuredSessions.append(sessionName)
+            memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
+        else:
+            # if the input speaker is not featured speaker, we have to
+            # scan the conference and add associated sessions
+            ancestor_key = ndb.Key(urlsafe=confKey)
+            sessions = Session.query(ancestor=ancestor_key).fetch()
+            featuredSessions = []
+            for session in sessions:
+                if session.speaker == speaker:
+                    featuredSessions.append(session.name)
+            cacheForm = FeaturedSpeakerQueryForm(
+                            featuredSpeaker=speaker,
+                            featuredSessions=featuredSessions
+                                                )
+            memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
 
     @staticmethod
     def cacheFeaturedSpeaker():
-        featuredSpeaker = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        """
+        This is an background task that sets the featuredSpeaker and
+        its associated session name
+        """
+        FeaturedSpeakerQueryForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
         # If there is no featured speaker in memcache,
         # find one and put it in memcache
-        if not featuredSpeaker:
+        if not FeaturedSpeakerQueryForm.featuredSpeaker:
             # get all conferences' key
             conferenceKeys = Conference.query().fetch(keys_only=True)
             # for each conference, sort sessions based on speaker
@@ -863,15 +908,17 @@ class ConferenceApi(remote.Service):
                 while(j < i + 2 and j < len(confSessions)):
                     if confSessions[i].speaker == confSessions[j].speaker:
                         featuredSpeaker = confSessions[i].speaker
-                        memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY,
-                                     featuredSpeaker)
                         break
                     else:
                         i += 1
                         j += 1
                 if featuredSpeaker:
+                    featuredSessions = Session.query(
+                        Session.speaker == featuredSpeaker).fetch()
+                    sessionNames = [sess.name for sess in featuredSessions]
                     break
 
-        return featuredSpeaker
+        return FeaturedSpeakerQueryForm(featuredSpeaker=featuredSpeaker,
+                                        featuredSessions=sessionNames)
 
 api = endpoints.api_server([ConferenceApi])  # register API
