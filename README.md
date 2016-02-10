@@ -19,7 +19,7 @@ App Engine application project for the Udacity web developer course.
 
 ## Task 1: Add Sessions to a Conference
 ### Design
-#### Session: 
+#### Session:
 It's a class containing basic information about a session. Properties include:
 - name: Each session must have a name(title), so we should use ndb.StringProperty(required=True)
 - highlights: It can be keywords, descriptor or abstraction, so use ndb.StringProperty()
@@ -28,13 +28,6 @@ It's a class containing basic information about a session. Properties include:
 - typeOfSession: we have different kinds of sessions, but if the user does not specify which type, we can let it be "Unknown", so use ndb.StringProperty(default='Unknown')
 - date: Similar to conference date, we need to have a date for the session, so use ndb.DateProperty()
 - startTime: To inform people to attend the session at the right time, we also need to have a property indicating the start time of the session, so use ndb.TimeProperty()
-
-#### Speaker:
-It's a class containing information about a speaker. This class is not used for now. But it can extend the session information about the speaker if people want to know more about the speaker. This class can also be used for implementing a speaker related endpoint. Peoperties are:
-
-- name: ndb.StringProperty(required=True)
-- age: ndb.IntegerProperty()
-- industry: It represents which industry for field this speaker comes from, so use ndb.StringProperty()
 
 ### Endpoint APIs
 - getConferenceSessions(websafeConferenceKey) -- Given a conference, return all sessions
