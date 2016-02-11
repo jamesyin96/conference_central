@@ -45,6 +45,7 @@ from models import SessionTypeQueryForm
 from models import SessionWishlistForm
 from models import SessionDateRangeQueryForm
 from models import FeaturedSpeakerQueryForm
+from models import SessionCreateReturnForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -585,7 +586,7 @@ class ConferenceApi(remote.Service):
         )
 
 # ---------------------- Sessions ---------------------------------
-    @endpoints.method(SESS_POST_REQUEST, BooleanMessage,
+    @endpoints.method(SESS_POST_REQUEST, SessionCreateReturnForm,
                       path='{websafeConferenceKey}/createSession',
                       http_method='POST', name='createSession')
     def createSession(self, request):
@@ -653,17 +654,14 @@ class ConferenceApi(remote.Service):
         Session(**data).put()
         speaker = data['speaker']
         sessionName = data['name']
-        if speaker:
-            speakerSessionQuant = Session.query(
-                ancestor=c_key).filter(Session.speaker == speaker).count()
-            if speakerSessionQuant > 1:
-                taskqueue.add(params={'speaker': speaker,
-                                      'sessionName': sessionName,
-                                      'websafeConfKey': websafeConferenceKey},
-                              url='/tasks/add_featured_session'
-                              )
+        taskqueue.add(params={'speaker': speaker,
+                              'sessionName': sessionName,
+                              'websafeConfKey': websafeConferenceKey},
+                      url='/tasks/add_featured_session'
+                      )
 
-        return BooleanMessage(data=True)
+        return SessionCreateReturnForm(name=data['name'],
+                                       websafeSessionKey=s_key.urlsafe())
 
     @endpoints.method(SESS_GET_REQUEST, SessionForms,
                       path='{websafeConferenceKey}/getConferenceSessions',
@@ -865,63 +863,32 @@ class ConferenceApi(remote.Service):
         This is an task that can add a session into the
         FeaturedSpeakerQueryForm in memcache
         """
-        cacheForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
-        # if the input speaker is the featured speaker, we add the session to
-        # the featured sessions list and save it to memcache
-        print speaker, sessionName
-        if cacheForm and cacheForm.featuredSpeaker == speaker:
-            cacheForm.featuredSessions.append(sessionName)
-            memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
-        else:
-            # if the input speaker is not featured speaker, we have to
-            # scan the conference and add associated sessions
-            ancestor_key = ndb.Key(urlsafe=confKey)
-            sessions = Session.query(ancestor=ancestor_key).fetch()
-            featuredSessions = []
-            for session in sessions:
-                if session.speaker == speaker:
-                    featuredSessions.append(session.name)
-            cacheForm = FeaturedSpeakerQueryForm(
-                            featuredSpeaker=speaker,
-                            featuredSessions=featuredSessions
-                                                )
-            memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
+        if not speaker:
+            return
 
-    @staticmethod
-    def cacheFeaturedSpeaker():
-        """
-        This is an background task that sets the featuredSpeaker and
-        its associated session name
-        """
-        FeaturedSpeakerQueryForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
-        # If there is no featured speaker in memcache,
-        # find one and put it in memcache
-        if not FeaturedSpeakerQueryForm.featuredSpeaker:
-            # get all conferences' key
-            conferenceKeys = Conference.query().fetch(keys_only=True)
-            # for each conference, sort sessions based on speaker
-            for key in conferenceKeys:
-                confSessions = Session.query(ancestor=key).\
-                                       order(Session.speaker).fetch()
-                # set two pointers to search the sessions list if two sessions
-                # have the same speaker, which is the featured speaker
-                i = 0
-                j = 1
-                while(j < i + 2 and j < len(confSessions)):
-                    if confSessions[i].speaker == confSessions[j].speaker:
-                        featuredSpeaker = confSessions[i].speaker
-                        break
-                    else:
-                        i += 1
-                        j += 1
-                if featuredSpeaker:
-                    featuredSessions = Session.query(
-                        Session.speaker == featuredSpeaker).fetch()
-                    sessionNames = [sess.name for sess in featuredSessions]
-                    break
-
-        cacheForm = FeaturedSpeakerQueryForm(featuredSpeaker=featuredSpeaker,
-                                             featuredSessions=sessionNames)
-        memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
+        c_key = ndb.Key(urlsafe=confKey)
+        speakerSessionQuant = Session.query(
+                ancestor=c_key).filter(Session.speaker == speaker).count()
+        if speakerSessionQuant > 1:
+            cacheForm = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+            # if the input speaker is the featured speaker, we add the session
+            # to the featured sessions list and save it to memcache
+            if cacheForm and cacheForm.featuredSpeaker == speaker:
+                cacheForm.featuredSessions.append(sessionName)
+                memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
+            else:
+                # if the input speaker is not featured speaker, we have to
+                # scan the conference and add associated sessions
+                ancestor_key = ndb.Key(urlsafe=confKey)
+                sessions = Session.query(ancestor=ancestor_key).fetch()
+                featuredSessions = []
+                for session in sessions:
+                    if session.speaker == speaker:
+                        featuredSessions.append(session.name)
+                cacheForm = FeaturedSpeakerQueryForm(
+                                featuredSpeaker=speaker,
+                                featuredSessions=featuredSessions
+                                                    )
+                memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, cacheForm)
 
 api = endpoints.api_server([ConferenceApi])  # register API
