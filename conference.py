@@ -654,11 +654,12 @@ class ConferenceApi(remote.Service):
         Session(**data).put()
         speaker = data['speaker']
         sessionName = data['name']
-        taskqueue.add(params={'speaker': speaker,
-                              'sessionName': sessionName,
-                              'websafeConfKey': websafeConferenceKey},
-                      url='/tasks/add_featured_session'
-                      )
+        if speaker:
+            taskqueue.add(params={'speaker': speaker,
+                                  'sessionName': sessionName,
+                                  'websafeConfKey': websafeConferenceKey},
+                          url='/tasks/add_featured_session'
+                          )
 
         return SessionCreateReturnForm(name=data['name'],
                                        websafeSessionKey=s_key.urlsafe())
